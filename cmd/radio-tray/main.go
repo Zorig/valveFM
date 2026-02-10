@@ -2,10 +2,12 @@ package main
 
 import (
 	"bufio"
+	_ "embed"
 	"errors"
 	"fmt"
 	"net"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -32,7 +34,9 @@ func main() {
 }
 
 func onReady() {
-	systray.SetTitle("Valve FM")
+	if icon := trayIcon(); len(icon) > 0 {
+		systray.SetIcon(icon)
+	}
 	systray.SetTooltip("Valve FM")
 
 	mPlayPause := systray.AddMenuItem("Play/Pause", "Toggle playback")
@@ -94,6 +98,19 @@ func onReady() {
 
 func onExit() {
 	_, _ = sendCommand(cmdQuit)
+}
+
+//go:embed assets/icon.png
+var iconPNG []byte
+
+//go:embed assets/icon.ico
+var iconICO []byte
+
+func trayIcon() []byte {
+	if runtime.GOOS == "windows" {
+		return iconICO
+	}
+	return iconPNG
 }
 
 func runTUI() error {
