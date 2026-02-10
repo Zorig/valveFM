@@ -334,6 +334,14 @@ func (m Model) renderHelp() string {
 		"?            Close help",
 		"Q            Quit",
 	}
+	if m.missingPlayer {
+		lines = append(lines, "", "Audio player not found.")
+		if m.downloadingPlayer {
+			lines = append(lines, "Downloading ffplay in the background...")
+		} else {
+			lines = append(lines, "Install mpv or ffplay and ensure it is in PATH.")
+		}
+	}
 	return m.styles.HelpBox.Render(lipgloss.JoinVertical(lipgloss.Left, lines...))
 }
 

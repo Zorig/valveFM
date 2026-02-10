@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"runtime"
 	"strings"
 	"time"
 
@@ -29,6 +30,7 @@ type Model struct {
 	player    *player.Player
 	favorites *config.Favorites
 	styles    Styles
+	ipc       *ipcServer
 
 	stations []radio.Station
 	filtered []radio.Station
@@ -49,9 +51,11 @@ type Model struct {
 	width  int
 	height int
 
-	playing     bool
-	playingUUID string
-	lastStation radio.Station
+	playing           bool
+	playingUUID       string
+	lastStation       radio.Station
+	missingPlayer     bool
+	downloadingPlayer bool
 
 	dialPos     float64
 	dialTarget  float64
@@ -83,6 +87,11 @@ type playMsg struct {
 
 type dialTickMsg struct{}
 
+type playerDownloadMsg struct {
+	path string
+	err  error
+}
+
 func NewModel(api *radio.Client, player *player.Player, favorites *config.Favorites, playerErr error, favErr error) Model {
 	location := textinput.New()
 	location.Prompt = "Country: "
@@ -113,7 +122,13 @@ func NewModel(api *radio.Client, player *player.Player, favorites *config.Favori
 	}
 
 	if playerErr != nil {
-		m.errMsg = playerErr.Error()
+		m.missingPlayer = true
+		if runtime.GOOS == "windows" {
+			m.downloadingPlayer = true
+			m.errMsg = "Audio player not found. Downloading ffplay in the background..."
+		} else {
+			m.errMsg = "Audio player not found. Install mpv or ffplay and ensure it is in PATH."
+		}
 	}
 	if favErr != nil {
 		if m.errMsg != "" {
@@ -127,7 +142,7 @@ func NewModel(api *radio.Client, player *player.Player, favorites *config.Favori
 }
 
 func (m Model) Init() tea.Cmd {
-	return m.loadStationsCmd()
+	return tea.Batch(m.loadStationsCmd(), m.startIPCCmd(), m.maybeDownloadPlayerCmd())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -143,6 +158,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if key == "ctrl+c" || key == "q" {
 			if m.player != nil {
 				_ = m.player.Stop()
+			}
+			if m.ipc != nil {
+				m.ipc.Close()
 			}
 			return m, tea.Quit
 		}
@@ -243,6 +261,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateDialRange()
 		m.snapDial()
 		return m, nil
+	case ipcReadyMsg:
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+			return m, nil
+		}
+		m.ipc = msg.server
+		return m, m.listenIPCCmd()
+	case ipcMsg:
+		return m.handleIPC(msg)
+	case ipcClosedMsg:
+		m.ipc = nil
+		return m, nil
+	case playerDownloadMsg:
+		m.downloadingPlayer = false
+		if msg.err != nil {
+			m.errMsg = "Failed to download ffplay: " + msg.err.Error() + " (install mpv or ffplay and ensure it is in PATH)"
+			return m, nil
+		}
+		p, err := player.New()
+		if err != nil {
+			m.errMsg = "Audio player not available: " + err.Error()
+			return m, nil
+		}
+		m.player = p
+		m.missingPlayer = false
+		m.downloadingPlayer = false
+		m.errMsg = ""
+		return m, nil
 	case countriesMsg:
 		m.countryLoading = false
 		if msg.err != nil {
@@ -263,7 +309,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.player == nil {
-			m.errMsg = "audio player not available"
+			if m.downloadingPlayer {
+				m.errMsg = "Audio player not available yet. Downloading ffplay..."
+			} else {
+				m.errMsg = "Audio player not available. Install mpv or ffplay and ensure it is in PATH."
+			}
 			return m, nil
 		}
 		if err := m.player.Play(msg.url); err != nil {
@@ -315,6 +365,42 @@ func (m Model) loadCountriesCmd() tea.Cmd {
 		}
 		countries, err := api.Countries(context.Background())
 		return countriesMsg{countries: countries, err: err}
+	}
+}
+
+func (m Model) maybeDownloadPlayerCmd() tea.Cmd {
+	if !m.missingPlayer || !m.downloadingPlayer {
+		return nil
+	}
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+		defer cancel()
+		path, err := player.DownloadFFplay(ctx)
+		return playerDownloadMsg{path: path, err: err}
+	}
+}
+
+func (m Model) startIPCCmd() tea.Cmd {
+	return func() tea.Msg {
+		server, err := newIPCServer()
+		return ipcReadyMsg{server: server, err: err}
+	}
+}
+
+func (m Model) listenIPCCmd() tea.Cmd {
+	if m.ipc == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		select {
+		case msg := <-m.ipc.messages:
+			return msg
+		case <-m.ipc.done:
+			return ipcClosedMsg{}
+		}
 	}
 }
 
@@ -427,6 +513,100 @@ func (m Model) updateCountrySelect(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, cmd
+}
+
+func (m Model) handleIPC(msg ipcMsg) (tea.Model, tea.Cmd) {
+	cmd, err := parseIPCCommand(msg.cmd)
+	if err != nil {
+		sendIPCReply(msg.reply, ipcReply{ok: false, err: err.Error()})
+		return m, m.listenIPCCmd()
+	}
+
+	var reply ipcReply
+	var cmdTea tea.Cmd
+
+	switch cmd {
+	case "PLAY_PAUSE":
+		cmdTea, reply = m.ipcPlayPause()
+	case "NEXT":
+		cmdTea, reply = m.ipcSelectAndPlay(1)
+	case "PREV":
+		cmdTea, reply = m.ipcSelectAndPlay(-1)
+	case "QUIT":
+		reply = ipcReply{ok: true}
+		sendIPCReply(msg.reply, reply)
+		if m.player != nil {
+			_ = m.player.Stop()
+		}
+		if m.ipc != nil {
+			m.ipc.Close()
+		}
+		return m, tea.Quit
+	case "STATUS":
+		reply = ipcReply{ok: true, data: m.ipcStatus()}
+	case "PING":
+		reply = ipcReply{ok: true, data: "OK"}
+	default:
+		reply = ipcReply{ok: false, err: "unknown command"}
+	}
+
+	sendIPCReply(msg.reply, reply)
+	return m, tea.Batch(cmdTea, m.listenIPCCmd())
+}
+
+func (m *Model) ipcPlayPause() (tea.Cmd, ipcReply) {
+	if m.playing {
+		if m.player != nil {
+			_ = m.player.Stop()
+		}
+		m.playing = false
+		return nil, ipcReply{ok: true}
+	}
+
+	station, ok := m.currentStation()
+	if !ok {
+		return nil, ipcReply{ok: false, err: "no station selected"}
+	}
+	return m.playStationCmd(station), ipcReply{ok: true, data: "QUEUED"}
+}
+
+func (m *Model) ipcSelectAndPlay(delta int) (tea.Cmd, ipcReply) {
+	list := m.visibleStations()
+	if len(list) == 0 {
+		return nil, ipcReply{ok: false, err: "no stations available"}
+	}
+	m.moveSelection(delta)
+	station, ok := m.currentStation()
+	if !ok {
+		return nil, ipcReply{ok: false, err: "no station selected"}
+	}
+	cmds := []tea.Cmd{m.dialTickCmd(), m.playStationCmd(station)}
+	return tea.Batch(cmds...), ipcReply{ok: true, data: "QUEUED"}
+}
+
+func (m *Model) ipcStatus() string {
+	station, _ := m.currentStation()
+	name := station.Name
+	if name == "" {
+		name = "-"
+	}
+
+	playing := "false"
+	if m.playing {
+		playing = "true"
+	}
+
+	return fmt.Sprintf("{\"playing\":%s,\"station\":%q,\"country\":%q}", playing, name, m.country)
+}
+
+func sendIPCReply(ch chan ipcReply, reply ipcReply) {
+	if ch == nil {
+		return
+	}
+	select {
+	case ch <- reply:
+	case <-time.After(200 * time.Millisecond):
+	}
 }
 
 func (m *Model) applyFilter() {
