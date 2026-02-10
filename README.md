@@ -22,6 +22,12 @@ Notes:
 - Windows address file: `~/.config/valvefm/ctl.addr`
 - Windows auto-downloads `ffplay.exe` on first run if no player is found.
 
+### ⚠️ Windows SmartScreen Warning
+When running `valvefm-windows.exe` for the first time, Windows might show a "Windows protected your PC" warning because the app is unsigned.
+1. Click **More info**.
+2. Click **Run anyway**.
+(This is normal for open-source software without an expensive code signing certificate.)
+
 ### Windows build note
 
 If you want the TUI visible, build without the GUI subsystem:
