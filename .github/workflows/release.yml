@@ -82,8 +82,7 @@ jobs:
           cat checksums.txt
 
       - name: Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/*
-          generate_release_notes: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.ref_name }} dist/* --clobber
