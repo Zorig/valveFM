@@ -18,7 +18,7 @@ type Player struct {
 	lastURL string
 }
 
-func New() (*Player, error) {
+func newExternal() (*Player, error) {
 	if path, backend := findBundledPlayer(); path != "" {
 		return &Player{backend: backend, path: path}, nil
 	}

@@ -27,7 +27,7 @@ const (
 
 type Model struct {
 	api       *radio.Client
-	player    *player.Player
+	player    player.Backend
 	favorites *config.Favorites
 	styles    Styles
 	ipc       *ipcServer
@@ -92,7 +92,7 @@ type playerDownloadMsg struct {
 	err  error
 }
 
-func NewModel(api *radio.Client, player *player.Player, favorites *config.Favorites, playerErr error, favErr error) Model {
+func NewModel(api *radio.Client, player player.Backend, favorites *config.Favorites, playerErr error, favErr error) Model {
 	location := textinput.New()
 	location.Prompt = "Country: "
 	location.Placeholder = "US"

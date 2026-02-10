@@ -4,8 +4,10 @@ Vintage FM radio TUI for streaming stations from radio-browser.info.
 
 ## Requirements
 
-- Go 1.22+
-- `mpv` (preferred) or `ffplay` in `PATH`
+- **Go 1.24+**
+- **Audio Backend:** Built-in pure Go MP3 player (no external deps).
+- **Optional:** `mpv` or `ffplay` for AAC/OGG support and better streaming stability.
+  - Windows: automatically downloads `ffplay.exe` if needed.
 
 ## Run (TUI + Tray)
 
