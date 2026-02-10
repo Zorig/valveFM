@@ -85,4 +85,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.ref_name }} dist/* --clobber
+          gh release upload ${{ github.ref_name }} dist/* --clobber -R ${{ github.repository }}
