@@ -2,6 +2,17 @@
 
 Vintage FM radio TUI for streaming stations from radio-browser.info.
 
+## Install
+
+### Homebrew (macOS / Linux)
+
+```bash
+brew tap zorig/tap
+brew install valvefm
+```
+
+### From source
+
 ## Requirements
 
 - **Go 1.24+**
@@ -45,6 +56,7 @@ GOOS=windows GOARCH=amd64 go build -o valvefm.exe ./cmd/radio-tray
 - L: choose country (searchable list)
 - /: search stations
 - F: toggle favorite
+- T: change theme
 - ?: help
 - Q / Ctrl+C: quit
 
@@ -53,6 +65,8 @@ GOOS=windows GOARCH=amd64 go build -o valvefm.exe ./cmd/radio-tray
 - Stations are fetched from the Radio Browser API and sorted by popularity.
 - Country selection uses a searchable list from the API.
 - Favorites are saved to `~/.config/valvefm/favorites.json`.
+- Theme preference is saved to `~/.config/valvefm/config.json`.
+- 12 built-in themes: Vintage, Tokyo Night, Nord, Catppuccin Mocha/Latte, Gruvbox Dark, Dracula, Solarized Dark, One Dark, Rose Pine, Kanagawa, Everforest.
 
 ## Smoke Test Checklist
 
