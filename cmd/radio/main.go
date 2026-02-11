@@ -21,8 +21,9 @@ func main() {
 
 	playerInstance, playerErr := player.New()
 	favorites, favErr := config.LoadFavorites()
+	cfg := config.LoadConfig()
 
-	model := ui.NewModel(api, playerInstance, favorites, playerErr, favErr)
+	model := ui.NewModel(api, playerInstance, favorites, playerErr, favErr, cfg.Theme)
 	program := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := program.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)

@@ -46,7 +46,10 @@ type Model struct {
 	search        textinput.Model
 	countrySearch textinput.Model
 
-	showHelp bool
+	showHelp  bool
+	showTheme bool
+	themeIdx  int
+	theme     Theme
 
 	width  int
 	height int
@@ -92,7 +95,9 @@ type playerDownloadMsg struct {
 	err  error
 }
 
-func NewModel(api *radio.Client, player player.Backend, favorites *config.Favorites, playerErr error, favErr error) Model {
+type themeSavedMsg struct{ err error }
+
+func NewModel(api *radio.Client, player player.Backend, favorites *config.Favorites, playerErr error, favErr error, themeName string) Model {
 	location := textinput.New()
 	location.Prompt = "Country: "
 	location.Placeholder = "US"
@@ -109,11 +114,22 @@ func NewModel(api *radio.Client, player player.Backend, favorites *config.Favori
 	countrySearch.Placeholder = "Type country or code"
 	countrySearch.Width = 26
 
+	theme := ThemeBySlug(themeName)
+	themeIdx := 0
+	for i, t := range Themes {
+		if t.Slug == theme.Slug {
+			themeIdx = i
+			break
+		}
+	}
+
 	m := Model{
 		api:           api,
 		player:        player,
 		favorites:     favorites,
-		styles:        DefaultStyles(),
+		styles:        BuildStyles(theme),
+		theme:         theme,
+		themeIdx:      themeIdx,
 		country:       "US",
 		location:      location,
 		search:        search,
@@ -168,6 +184,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.showHelp {
 			if key == "?" || key == "esc" || key == "enter" {
 				m.showHelp = false
+			}
+			return m, nil
+		}
+
+		if m.showTheme {
+			switch key {
+			case "t", "T", "esc":
+				m.showTheme = false
+			case "up", "k":
+				if m.themeIdx > 0 {
+					m.themeIdx--
+					m.theme = Themes[m.themeIdx]
+					m.styles = BuildStyles(m.theme)
+				}
+			case "down", "j":
+				if m.themeIdx < len(Themes)-1 {
+					m.themeIdx++
+					m.theme = Themes[m.themeIdx]
+					m.styles = BuildStyles(m.theme)
+				}
+			case "enter":
+				m.showTheme = false
+				return m, m.saveThemeCmd()
 			}
 			return m, nil
 		}
@@ -234,6 +273,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.search.Focus()
 			m.search.CursorEnd()
 			return m, textinput.Blink
+		case "t", "T":
+			m.showTheme = true
 		case "f", "F":
 			if m.favorites != nil {
 				if station, ok := m.currentStation(); ok {
@@ -327,9 +368,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case dialTickMsg:
 		return m.updateDialAnimation()
+	case themeSavedMsg:
+		if msg.err != nil {
+			m.errMsg = "Failed to save theme: " + msg.err.Error()
+		}
+		return m, nil
 	}
 
 	return m, nil
+}
+
+func (m Model) saveThemeCmd() tea.Cmd {
+	slug := m.theme.Slug
+	return func() tea.Msg {
+		err := config.SaveTheme(slug)
+		return themeSavedMsg{err: err}
+	}
 }
 
 func (m Model) loadStationsCmd() tea.Cmd {

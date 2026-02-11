@@ -88,6 +88,10 @@ func (m Model) View() string {
 		help := m.renderHelp()
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, help)
 	}
+	if m.showTheme {
+		picker := m.renderThemePicker()
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, picker)
+	}
 	if m.inputMode == inputCountrySelect {
 		selector := m.renderCountrySelect(contentWidth, m.height)
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, selector)
@@ -315,9 +319,9 @@ func (m Model) renderKeyHints(width int) string {
 		return "Arrows Tune  Enter Play  Space Stop  Q Quit"
 	}
 	if width < 62 {
-		return "Arrows Tune  Enter Play  Space Stop  L Country  / Search  ? Help  Q Quit"
+		return "Arrows Tune  Enter Play  Space Stop  L Country  / Search  T Theme  ? Help  Q Quit"
 	}
-	return "Arrows Tune  Up/Down Browse  Enter Play  Space Stop  L Country  / Search  F Favorite  ? Help  Q Quit"
+	return "Arrows Tune  Up/Down Browse  Enter Play  Space Stop  L Country  / Search  F Favorite  T Theme  ? Help  Q Quit"
 }
 
 func (m Model) renderHelp() string {
@@ -331,6 +335,7 @@ func (m Model) renderHelp() string {
 		"L            Choose country",
 		"/            Search stations",
 		"F            Favorite station",
+		"T            Change theme",
 		"?            Close help",
 		"Q            Quit",
 	}
@@ -342,6 +347,25 @@ func (m Model) renderHelp() string {
 			lines = append(lines, "Install mpv or ffplay and ensure it is in PATH.")
 		}
 	}
+	return m.styles.HelpBox.Render(lipgloss.JoinVertical(lipgloss.Left, lines...))
+}
+
+func (m Model) renderThemePicker() string {
+	lines := []string{
+		m.styles.ListHeader.Render("Select Theme"),
+		"",
+	}
+	for i, t := range Themes {
+		marker := "  "
+		style := m.styles.ListItem
+		if i == m.themeIdx {
+			marker = "> "
+			style = m.styles.ListActive
+		}
+		label := t.Name
+		lines = append(lines, style.Render(marker+label))
+	}
+	lines = append(lines, "", m.styles.Muted.Render("Enter save  Esc cancel"))
 	return m.styles.HelpBox.Render(lipgloss.JoinVertical(lipgloss.Left, lines...))
 }
 
