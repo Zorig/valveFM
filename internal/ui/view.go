@@ -335,6 +335,10 @@ func (m Model) renderList(width int, maxItems int) string {
 }
 
 func (m Model) renderKeyHints(width int) string {
+	vLabel := "V Favorites"
+	if m.isFavoritesSource() {
+		vLabel = "V All Stations"
+	}
 	if width < 30 {
 		return "Enter Play  Q Quit"
 	}
@@ -342,9 +346,9 @@ func (m Model) renderKeyHints(width int) string {
 		return "Arrows Tune  Enter Play  Space Stop  [ ] Page  Q Quit"
 	}
 	if width < 62 {
-		return "Arrows Tune  Enter Play  Space Stop  [ ] Page  L Country  V Favorites  / Search  T Theme  ? Help  Q Quit"
+		return "Arrows Tune  Enter Play  Space Stop  [ ] Page  L Country  " + vLabel + "  / Search  T Theme  ? Help  Q Quit"
 	}
-	return "Arrows Tune  Up/Down Browse  Enter Play  Space Stop  [ ] Page  L Country  V Favorites  / Search  F Favorite  T Theme  ? Help  Q Quit"
+	return "Arrows Tune  Up/Down Browse  Enter Play  Space Stop  [ ] Page  L Country  " + vLabel + "  / Search  F Favorite  T Theme  ? Help  Q Quit"
 }
 
 func (m Model) renderHelp() string {
@@ -357,8 +361,8 @@ func (m Model) renderHelp() string {
 		"Space        Stop/Resume",
 		"[ / ]        Previous/Next stations page",
 		"L            Choose country",
-		"V            Show favorites",
-		"/            Search stations (country API or local favorites)",
+		"V            Toggle favorites / all stations",
+		"/            Search stations (exits favorites view)",
 		"F            Favorite station",
 		"T            Change theme",
 		"?            Close help",

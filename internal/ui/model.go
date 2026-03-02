@@ -317,6 +317,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ensureCountrySelection()
 			return m, textinput.Blink
 		case "V", "v":
+			if m.stationSource == sourceFavorites {
+				// Toggle back to country list
+				m.stationSource = sourceCountry
+				m.activeSearch = ""
+				m.search.SetValue("")
+				m.page = 0
+				m.hasMore = false
+				m.selected = 0
+				m.loading = true
+				m.errMsg = ""
+				return m, m.loadStationsCmd()
+			}
 			if m.favorites == nil || m.favorites.Count() == 0 {
 				m.errMsg = "No favorites saved yet"
 				return m, nil
@@ -331,6 +343,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.errMsg = ""
 			return m, m.loadStationsCmd()
 		case "/":
+			// If in favorites view, switch to full station list before searching
+			if m.stationSource == sourceFavorites {
+				m.stationSource = sourceCountry
+				m.activeSearch = ""
+			}
 			m.inputMode = inputSearch
 			m.search.SetValue(m.activeSearch)
 			m.search.Focus()
