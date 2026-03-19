@@ -225,6 +225,10 @@ func (m Model) renderStationMeta() string {
 		m.styles.Meta.Render(status),
 	}
 
+	if m.playing && station.UUID == m.playingUUID && m.nowPlaying != "" {
+		lines = append(lines, m.styles.Accent.Render("Now Playing: "+m.nowPlaying))
+	}
+
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
@@ -249,6 +253,13 @@ func (m Model) renderStationMetaCompact(width int, tiny bool) string {
 	meta := fmt.Sprintf("Tags: %s | %s", fallback(station.Tags, "-"), status)
 	meta = truncateText(meta, max(width-6, 12))
 	line2 := m.styles.Meta.Render(meta)
+
+	if m.playing && station.UUID == m.playingUUID && m.nowPlaying != "" {
+		track := truncateText("♪ "+m.nowPlaying, max(width-6, 12))
+		line3 := m.styles.Accent.Render(track)
+		return lipgloss.JoinVertical(lipgloss.Left, line1, line2, line3)
+	}
+
 	return lipgloss.JoinVertical(lipgloss.Left, line1, line2)
 }
 

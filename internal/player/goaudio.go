@@ -3,6 +3,7 @@ package player
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -28,6 +29,7 @@ func EnsureSpeaker() error {
 
 // GoPlayer plays MP3 HTTP streams using the high-level beep library.
 // It handles resampling automatically, fixing pitch issues with different sample rates.
+// It also surfaces ICY stream metadata (now-playing titles) via MetadataCh.
 type GoPlayer struct {
 	mu          sync.Mutex
 	streamer    beep.StreamSeekCloser
@@ -36,11 +38,19 @@ type GoPlayer struct {
 	lastURL     string
 	playing     bool
 	initialized bool
+	metadataCh  chan string
 }
 
 // NewGoPlayer creates a GoPlayer instance.
 func NewGoPlayer() *GoPlayer {
-	return &GoPlayer{}
+	return &GoPlayer{
+		metadataCh: make(chan string, 4),
+	}
+}
+
+// MetadataCh returns a channel that receives ICY stream titles as they change.
+func (g *GoPlayer) MetadataCh() <-chan string {
+	return g.metadataCh
 }
 
 // initSpeaker initializes the audio device once.
@@ -76,7 +86,7 @@ func (g *GoPlayer) Play(url string) error {
 		return fmt.Errorf("request: %w", err)
 	}
 	req.Header.Set("User-Agent", "ValveFM/1.0")
-	req.Header.Set("Icy-MetaData", "0")
+	req.Header.Set("Icy-MetaData", "1")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -87,8 +97,20 @@ func (g *GoPlayer) Play(url string) error {
 		return fmt.Errorf("stream HTTP %d", resp.StatusCode)
 	}
 
+	// Wrap body with ICY reader if the server advertises a metadata interval.
+	var body io.ReadCloser = resp.Body
+	if metaInt := parseICYMetaInt(resp.Header.Get("icy-metaint")); metaInt > 0 {
+		ch := g.metadataCh
+		body = newICYReader(resp.Body, metaInt, func(title string) {
+			select {
+			case ch <- title:
+			default:
+			}
+		})
+	}
+
 	// Decode MP3 via beep (wraps go-mp3)
-	streamer, format, err := mp3.Decode(resp.Body)
+	streamer, format, err := mp3.Decode(body)
 	if err != nil {
 		resp.Body.Close()
 		return fmt.Errorf("mp3 decode: %w", err)

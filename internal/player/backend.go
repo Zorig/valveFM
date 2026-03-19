@@ -14,6 +14,12 @@ type Backend interface {
 	LastURL() string
 }
 
+// MetadataProvider is optionally implemented by backends that support ICY stream metadata.
+// The channel receives StreamTitle values as they change during playback.
+type MetadataProvider interface {
+	MetadataCh() <-chan string
+}
+
 // CompositeBackend wraps multiple backends and selects the best one dynamically.
 type CompositeBackend struct {
 	mu      sync.Mutex
@@ -85,6 +91,14 @@ func (c *CompositeBackend) LastURL() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.lastURL
+}
+
+// MetadataCh returns the ICY metadata channel from the Go backend, if available.
+func (c *CompositeBackend) MetadataCh() <-chan string {
+	if c.gp != nil {
+		return c.gp.MetadataCh()
+	}
+	return nil
 }
 
 // New returns a smart player that tries pure Go audio first,

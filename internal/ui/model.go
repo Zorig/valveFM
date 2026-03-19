@@ -71,6 +71,7 @@ type Model struct {
 	playing           bool
 	playingUUID       string
 	lastStation       radio.Station
+	nowPlaying        string
 	missingPlayer     bool
 	downloadingPlayer bool
 
@@ -115,6 +116,8 @@ type playerDownloadMsg struct {
 }
 
 type themeSavedMsg struct{ err error }
+
+type nowPlayingMsg struct{ title string }
 
 func NewModel(api *radio.Client, p player.Backend, favorites *config.Favorites, playerErr error, favErr error, themeName string) Model {
 	location := textinput.New()
@@ -183,7 +186,7 @@ func NewModel(api *radio.Client, p player.Backend, favorites *config.Favorites, 
 
 func (m Model) Init() tea.Cmd {
 	m.noise.Start()
-	return tea.Batch(m.loadStationsCmd(), m.startIPCCmd(), m.maybeDownloadPlayerCmd())
+	return tea.Batch(m.loadStationsCmd(), m.startIPCCmd(), m.maybeDownloadPlayerCmd(), m.listenMetadataCmd())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -447,6 +450,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.applyCountryFilter()
 		m.ensureCountrySelection()
 		return m, nil
+	case nowPlayingMsg:
+		m.nowPlaying = msg.title
+		return m, m.listenMetadataCmd()
 	case playMsg:
 		if msg.err != nil {
 			m.noise.Stop()
@@ -472,6 +478,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.playing = true
 		m.playingUUID = msg.station.UUID
 		m.lastStation = msg.station
+		m.nowPlaying = ""
 		return m, nil
 	case dialTickMsg:
 		return m.updateDialAnimation()
@@ -630,6 +637,24 @@ func (m Model) maybeDownloadPlayerCmd() tea.Cmd {
 		defer cancel()
 		path, err := player.DownloadFFplay(ctx)
 		return playerDownloadMsg{path: path, err: err}
+	}
+}
+
+func (m Model) listenMetadataCmd() tea.Cmd {
+	mp, ok := m.player.(player.MetadataProvider)
+	if !ok {
+		return nil
+	}
+	ch := mp.MetadataCh()
+	if ch == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		title, ok := <-ch
+		if !ok {
+			return nil
+		}
+		return nowPlayingMsg{title: title}
 	}
 }
 
