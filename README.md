@@ -23,9 +23,18 @@ choco install valvefm
 
 ### From source
 
+```bash
+make build        # TUI + tray -> bin/valvefm
+make build-tui    # TUI only   -> bin/valvefm-tui
+```
+
+### TUI-only (no tray)
+
+Prefer a plain terminal app without the system tray? Grab a `valvefm-tui-*` asset from the [releases](https://github.com/zorig/valvefm/releases), or build it yourself with `make build-tui` (Windows: `make build-windows-tui`). It runs the same TUI via `cmd/radio`, without the tray/IPC layer.
+
 ## Requirements
 
-- **Go 1.24+**
+- **Go 1.26+**
 - **Audio Backend:** Built-in pure Go MP3 player (no external deps).
 - **Optional:** `mpv` or `ffplay` for AAC/OGG support and better streaming stability.
   - Windows: automatically downloads `ffplay.exe` if needed.
@@ -34,6 +43,12 @@ choco install valvefm
 
 ```bash
 go run ./cmd/radio-tray
+```
+
+TUI only (no tray):
+
+```bash
+go run ./cmd/radio
 ```
 
 Notes:
@@ -55,6 +70,12 @@ If you want the TUI visible, build without the GUI subsystem:
 
 ```bash
 GOOS=windows GOARCH=amd64 go build -o valvefm.exe ./cmd/radio-tray
+```
+
+The TUI-only build never attaches to a GUI subsystem and needs no extra flags:
+
+```bash
+GOOS=windows GOARCH=amd64 go build -o valvefm-tui.exe ./cmd/radio
 ```
 
 ## Keybindings

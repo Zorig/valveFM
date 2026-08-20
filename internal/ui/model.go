@@ -53,7 +53,7 @@ type Model struct {
 	hasMore bool
 
 	stationSource stationSource
-	activeSearch string
+	activeSearch  string
 
 	inputMode     inputMode
 	location      textinput.Model

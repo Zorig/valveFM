@@ -23,7 +23,7 @@ choco install valvefm
 
 ## Requisitos
 
-- **Go 1.24 o superior**
+- **Go 1.26 o superior**
 - **Reproductor de audio:** Reproductor de MP3 puro en Go integrado (sin dependencias externas).
 - **Opcional:** `mpv` o `ffplay` para soporte de AAC/OGG y mayor estabilidad en la transmisión.
   - Windows: se descarga automáticamente `ffplay.exe` si es necesario.

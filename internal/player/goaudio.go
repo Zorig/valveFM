@@ -62,6 +62,18 @@ func (g *GoPlayer) initSpeaker() error {
 	return nil
 }
 
+// decodeMP3 wraps mp3.Decode, converting panics (which go-mp3 can throw on
+// malformed/truncated streams) into errors so playback can fall back to an
+// external player instead of crashing the TUI.
+func decodeMP3(r io.ReadCloser) (streamer beep.StreamSeekCloser, format beep.Format, err error) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			err = fmt.Errorf("mp3 decode panic: %v", rec)
+		}
+	}()
+	return mp3.Decode(r)
+}
+
 // Play opens an HTTP stream and starts playback.
 func (g *GoPlayer) Play(url string) error {
 	if url == "" {
@@ -110,7 +122,7 @@ func (g *GoPlayer) Play(url string) error {
 	}
 
 	// Decode MP3 via beep (wraps go-mp3)
-	streamer, format, err := mp3.Decode(body)
+	streamer, format, err := decodeMP3(body)
 	if err != nil {
 		resp.Body.Close()
 		return fmt.Errorf("mp3 decode: %w", err)
