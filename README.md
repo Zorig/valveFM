@@ -3,6 +3,8 @@
 Vintage FM radio TUI for streaming stations from radio-browser.info.
 <img width="3024" height="1898" alt="image" src="https://github.com/user-attachments/assets/c9c6ab00-7525-4402-afcd-32ba0e6cd83c" />
 
+**Languages:** [English](README.md) | [Español](README.es-ES.md)
+
 ## Install
 
 ### Homebrew (macOS / Linux)
